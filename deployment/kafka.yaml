@@ -1,0 +1,189 @@
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: zookeeper-volume
+  labels:
+    type: local
+    app: zookeeper
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 256Mi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: "/mnt/data-zk"
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: zookeeper-pv-claim
+  labels:
+    app: zookeeper
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper
+  labels:
+    app: zookeeper
+spec:
+  selector:
+    app: zookeeper
+  ports:
+    - name: client
+      port: 2181
+    - name: follower
+      port: 2888
+    - name: leader
+      port: 3888
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: zookeeper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zookeeper
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+    spec:
+      initContainers:
+        - name: init-hostpath-pv
+          image: busybox
+          command: ["sh", "-c", "chown -R 1001 /bitnami/zookeeper"]
+          volumeMounts:
+            - name: zookeeper
+              mountPath: /bitnami/zookeeper
+      containers:
+        - name: zookeeper
+          image: bitnami/zookeeper:3.7
+          ports:
+            - containerPort: 2181
+          env:
+            - name: ALLOW_ANONYMOUS_LOGIN
+              value: "yes"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "64m"
+            limits:
+              memory: "256Mi"
+              cpu: "256m"
+          volumeMounts:
+            - name: zookeeper
+              mountPath: /bitnami/zookeeper
+      volumes:
+        - name: zookeeper
+          persistentVolumeClaim:
+            claimName: zookeeper-pv-claim
+---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: kafka-volume
+  labels:
+    type: local
+    app: kafka
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 256Mi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: "/mnt/data-kafka"
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: kafka-pv-claim
+  labels:
+    app: kafka
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  labels:
+    app: kafka
+spec:
+  selector:
+    app: kafka
+  ports:
+    - name: kafka
+      port: 9092
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: kafka
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      initContainers:
+        - name: init-hostpath-pv
+          image: busybox
+          command: ["sh", "-c", "chown -R 1001 /bitnami/kafka"]
+          volumeMounts:
+            - name: kafka
+              mountPath: /bitnami/kafka
+      containers:
+        - name: kafka
+          image: bitnami/kafka:2
+          ports:
+            - containerPort: 9092
+          env:
+            - name: KAFKA_CFG_ZOOKEEPER_CONNECT
+              value: zookeeper:2181
+            - name: ALLOW_PLAINTEXT_LISTENER
+              value: "yes"
+            - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
+              value: CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
+            - name: KAFKA_CFG_LISTENERS
+              value: CLIENT://:9092,EXTERNAL://:9093
+            - name: KAFKA_CFG_ADVERTISED_LISTENERS
+              value: CLIENT://kafka:9092,EXTERNAL://localhost:9093
+            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+              value: CLIENT
+            - name: KAFKA_HEAP_OPTS
+              value: -Xmx512m -Xms256m
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "2"
+          volumeMounts:
+            - name: kafka
+              mountPath: /bitnami/kafka
+      volumes:
+        - name: kafka
+          persistentVolumeClaim:
+            claimName: kafka-pv-claim
