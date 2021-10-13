@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    service: udaconnect-location-api
+  name: udaconnect-location-api
+spec:
+  ports:
+    - name: "5005"
+      port: 5005
+      targetPort: 5005
+      nodePort: 30002
+  selector:
+    service: udaconnect-location-api
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    service: udaconnect-location-api
+  name: udaconnect-location-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      service: udaconnect-location-api
+  template:
+    metadata:
+      labels:
+        service: udaconnect-location-api
+    spec:
+      containers:
+        - image: wldaunfr/udaconnect-location-api:latest
+          name: udaconnect-location-api
+          imagePullPolicy: Always
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "64m"
+            limits:
+              memory: "256Mi"
+              cpu: "256m"
+          env:
+            - name: KAFKA_SERVERS
+              value: kafka:9092
+      restartPolicy: Always

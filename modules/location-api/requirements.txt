@@ -1,0 +1,4 @@
+grpcio
+kafka-python
+marshmallow
+protobuf
